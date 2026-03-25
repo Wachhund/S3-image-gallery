@@ -8,6 +8,7 @@ use Slim\Factory\AppFactory;
 use Slim\Views\PhpRenderer;
 use S3Gallery\Service\DatabaseFactory;
 use S3Gallery\Service\GalleryService;
+use S3Gallery\Service\PasskeyService;
 use S3Gallery\Service\S3ClientFactory;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -27,6 +28,7 @@ $renderer->setLayout('layout.php');
 
 $db = DatabaseFactory::create();
 $gallery = new GalleryService($db);
+$passkey = new PasskeyService($db);
 
 // Home — top-level directories
 $app->get('/', function (Request $request, Response $response) use ($renderer, $gallery): Response {
@@ -109,6 +111,74 @@ $app->get('/image/{id:\d+}', function (Request $request, Response $response, arr
         return $response;
     } catch (\Throwable $e) {
         return $response->withStatus(502);
+    }
+});
+
+// --- Auth: Passkey Registration ---
+
+$app->get('/register', function (Request $request, Response $response) use ($renderer, $passkey): Response {
+    if (!$passkey->isOtpConfigured()) {
+        $status = 'disabled';
+    } elseif ($passkey->hasPasskeys()) {
+        $status = 'has_passkey';
+    } elseif ($passkey->isOtpConsumed()) {
+        $status = 'consumed';
+    } else {
+        $status = 'ready';
+    }
+
+    return $renderer->render($response, 'pages/register.php', [
+        'title' => 'Passkey registrieren',
+        'status' => $status,
+    ]);
+});
+
+$app->post('/register/challenge', function (Request $request, Response $response) use ($passkey): Response {
+    $body = json_decode((string) $request->getBody(), true) ?? [];
+    $otp = $body['otp'] ?? '';
+
+    if ($passkey->isOtpConsumed() || $passkey->hasPasskeys()) {
+        $response->getBody()->write(json_encode(['error' => 'Registrierung nicht mehr verfügbar.']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+    }
+
+    if (!$passkey->verifyOtp($otp)) {
+        $response->getBody()->write(json_encode(['error' => 'Ungültiges Einmal-Passwort.']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+    }
+
+    session_start();
+    $createArgs = $passkey->getCreateArgs();
+    $_SESSION['webauthn_challenge'] = $passkey->getChallenge();
+
+    $response->getBody()->write(json_encode(['options' => $createArgs]));
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
+$app->post('/register/complete', function (Request $request, Response $response) use ($passkey): Response {
+    session_start();
+    $challengeHex = $_SESSION['webauthn_challenge'] ?? '';
+    unset($_SESSION['webauthn_challenge']);
+
+    if ($challengeHex === '') {
+        $response->getBody()->write(json_encode(['error' => 'Keine Challenge gefunden. Bitte erneut versuchen.']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
+
+    $body = json_decode((string) $request->getBody(), true) ?? [];
+
+    try {
+        $passkey->processRegistration(
+            $body['clientDataJSON'] ?? '',
+            $body['attestationObject'] ?? '',
+            $challengeHex,
+        );
+
+        $response->getBody()->write(json_encode(['success' => true]));
+        return $response->withHeader('Content-Type', 'application/json');
+    } catch (\Throwable $e) {
+        $response->getBody()->write(json_encode(['error' => 'Registrierung fehlgeschlagen: ' . $e->getMessage()]));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
     }
 });
 

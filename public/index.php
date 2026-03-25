@@ -182,4 +182,138 @@ $app->post('/register/complete', function (Request $request, Response $response)
     }
 });
 
+// --- Auth: Login ---
+
+$app->get('/login', function (Request $request, Response $response) use ($renderer, $passkey): Response {
+    session_start();
+    if (!empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/')->withStatus(302);
+    }
+
+    return $renderer->render($response, 'pages/login.php', [
+        'title' => 'Anmelden',
+        'hasPasskeys' => $passkey->hasPasskeys(),
+    ]);
+});
+
+$app->post('/login/challenge', function (Request $request, Response $response) use ($passkey): Response {
+    if (!$passkey->hasPasskeys()) {
+        $response->getBody()->write(json_encode(['error' => 'Kein Passkey registriert.']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
+
+    session_start();
+    $getArgs = $passkey->getGetArgs();
+    $_SESSION['webauthn_challenge'] = $passkey->getChallenge();
+
+    $response->getBody()->write(json_encode(['options' => $getArgs]));
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
+$app->post('/login/complete', function (Request $request, Response $response) use ($passkey): Response {
+    session_start();
+    $challengeHex = $_SESSION['webauthn_challenge'] ?? '';
+    unset($_SESSION['webauthn_challenge']);
+
+    if ($challengeHex === '') {
+        $response->getBody()->write(json_encode(['error' => 'Keine Challenge gefunden.']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
+
+    $body = json_decode((string) $request->getBody(), true) ?? [];
+
+    try {
+        $ok = $passkey->processAuthentication(
+            $body['id'] ?? '',
+            $body['clientDataJSON'] ?? '',
+            $body['authenticatorData'] ?? '',
+            $body['signature'] ?? '',
+            $challengeHex,
+        );
+
+        if (!$ok) {
+            throw new \RuntimeException('Passkey nicht erkannt.');
+        }
+
+        $_SESSION['authenticated'] = true;
+        $response->getBody()->write(json_encode(['success' => true, 'redirect' => '/']));
+        return $response->withHeader('Content-Type', 'application/json');
+    } catch (\Throwable $e) {
+        $response->getBody()->write(json_encode(['error' => 'Anmeldung fehlgeschlagen: ' . $e->getMessage()]));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+    }
+});
+
+$app->get('/logout', function (Request $request, Response $response): Response {
+    session_start();
+    session_destroy();
+    return $response->withHeader('Location', '/')->withStatus(302);
+});
+
+// --- Auth-protected: Event Gallery Management ---
+
+$app->get('/gallery/create', function (Request $request, Response $response) use ($renderer): Response {
+    session_start();
+    if (empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    $csrfToken = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = $csrfToken;
+
+    return $renderer->render($response, 'pages/gallery-create.php', [
+        'title' => 'Event-Galerie anlegen',
+        'csrfToken' => $csrfToken,
+    ]);
+});
+
+$app->post('/gallery/create', function (Request $request, Response $response) use ($renderer, $gallery): Response {
+    session_start();
+    if (empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    $data = $request->getParsedBody() ?? [];
+    $csrfToken = $data['csrf_token'] ?? '';
+    $eventDate = trim($data['event_date'] ?? '');
+    $eventName = trim($data['event_name'] ?? '');
+
+    $errors = [];
+
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $csrfToken)) {
+        $errors[] = 'Ungültiges Formular-Token. Bitte erneut versuchen.';
+    }
+
+    $dateError = GalleryService::validateDate($eventDate);
+    if ($dateError) {
+        $errors[] = $dateError;
+    }
+
+    $nameError = GalleryService::validateEventName($eventName);
+    if ($nameError) {
+        $errors[] = $nameError;
+    }
+
+    if (empty($errors) && $gallery->eventGalleryExists($eventDate, $eventName)) {
+        $errors[] = 'Eine Galerie mit diesem Datum und Namen existiert bereits.';
+    }
+
+    if (!empty($errors)) {
+        $newCsrf = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token'] = $newCsrf;
+
+        return $renderer->render($response, 'pages/gallery-create.php', [
+            'title' => 'Event-Galerie anlegen',
+            'csrfToken' => $newCsrf,
+            'errors' => $errors,
+            'old' => ['event_date' => $eventDate, 'event_name' => $eventName],
+        ]);
+    }
+
+    $bucket = $_ENV['S3_BUCKET'] ?? 'gallery';
+    $dirId = $gallery->createEventGallery($eventDate, $eventName, $bucket);
+
+    return $response->withHeader('Location', '/browse/' . $dirId)->withStatus(302);
+});
+
 $app->run();

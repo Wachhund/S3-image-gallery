@@ -90,6 +90,84 @@ final class GalleryService
         return $row ?: null;
     }
 
+    public function createEventGallery(string $date, string $eventName, string $bucket): int
+    {
+        $year = substr($date, 0, 4);
+        $dirname = "{$date} {$eventName}";
+        $fullPath = "{$year}/{$dirname}";
+
+        $yearId = $this->ensureYearDir($year, $bucket);
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO dirs (dirname, bucket, parent_id) VALUES (:dirname, :bucket, :parent_id)'
+        );
+        $stmt->execute([
+            'dirname' => $fullPath,
+            'bucket' => $bucket,
+            'parent_id' => $yearId,
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function eventGalleryExists(string $date, string $eventName): bool
+    {
+        $year = substr($date, 0, 4);
+        $fullPath = "{$year}/{$date} {$eventName}";
+
+        $stmt = $this->db->prepare('SELECT 1 FROM dirs WHERE dirname = :dirname LIMIT 1');
+        $stmt->execute(['dirname' => $fullPath]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    public static function validateEventName(string $name): ?string
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return 'Eventname darf nicht leer sein.';
+        }
+        if (mb_strlen($name) > 100) {
+            return 'Eventname darf maximal 100 Zeichen lang sein.';
+        }
+        if (preg_match('#[/\\\\]|\.\.#', $name)) {
+            return 'Eventname darf keine Schrägstriche oder ".." enthalten.';
+        }
+        if (!preg_match('/^[\p{L}\p{N} \-_.]+$/u', $name)) {
+            return 'Eventname darf nur Buchstaben, Zahlen, Leerzeichen, Bindestriche, Punkte und Unterstriche enthalten.';
+        }
+        return null;
+    }
+
+    public static function validateDate(string $date): ?string
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return 'Datum muss im Format YYYY-MM-DD sein.';
+        }
+        $parts = explode('-', $date);
+        if (!checkdate((int) $parts[1], (int) $parts[2], (int) $parts[0])) {
+            return 'Ungültiges Datum.';
+        }
+        return null;
+    }
+
+    private function ensureYearDir(string $year, string $bucket): int
+    {
+        $stmt = $this->db->prepare('SELECT id FROM dirs WHERE dirname = :dirname LIMIT 1');
+        $stmt->execute(['dirname' => $year]);
+        $row = $stmt->fetch();
+
+        if ($row) {
+            return (int) $row['id'];
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO dirs (dirname, bucket, parent_id) VALUES (:dirname, :bucket, 0)'
+        );
+        $stmt->execute(['dirname' => $year, 'bucket' => $bucket]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
     public function buildBreadcrumbs(int $dirId): array
     {
         $crumbs = [];

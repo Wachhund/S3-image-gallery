@@ -10,10 +10,11 @@ $title = $title ?? 'S3 Image Gallery';
 $pageTitle = ($title !== 'S3 Image Gallery') ? "{$title} — S3 Gallery" : 'S3 Image Gallery';
 ?>
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" style="color-scheme: dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#141211">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <meta name="description" content="S3 Image Gallery — Modern photo gallery powered by PHP, Slim 4 and S3-compatible storage.">
     <link rel="stylesheet" href="/css/style.css">

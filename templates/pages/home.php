@@ -40,7 +40,7 @@ $years = $years ?? [];
                 </div>
                 <div class="card__body">
                     <h2 class="card__title"><?= htmlspecialchars($year['dirname'] ?? '') ?></h2>
-                    <span class="card__meta"><?= (int)($year['count'] ?? 0) ?> Einträge</span>
+                    <span class="card__meta"><?= (int)($year['image_count'] ?? 0) ?> Bilder</span>
                 </div>
             </a>
         <?php endforeach; ?>

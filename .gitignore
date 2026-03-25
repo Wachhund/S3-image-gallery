@@ -1,0 +1,22 @@
+# Environment
+.env
+
+# PHP / Composer
+/vendor/
+composer.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Thumbnails (legacy local storage)
+/thumbs/
+
+# Docker volumes (if accidentally created locally)
+/docker/db/data/

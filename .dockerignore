@@ -1,0 +1,31 @@
+.git
+.gitignore
+.env
+.env.example
+.dockerignore
+docker/db/
+docker/nginx/
+*.md
+LICENSE
+
+# Legacy files
+buildThumbs.php
+config.inc.php
+index.php
+scan.php
+schema.sql
+s3gallery.css
+lib/
+README.txt
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+vendor/
+thumbs/

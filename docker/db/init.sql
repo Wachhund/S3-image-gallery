@@ -9,9 +9,8 @@ CREATE TABLE IF NOT EXISTS `dirs` (
     `created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_dirname` (`dirname`(255)),
-    KEY `idx_parent_id` (`parent_id`),
-    KEY `idx_bucket` (`bucket`)
+    UNIQUE KEY `uq_dirname_bucket` (`dirname`(255), `bucket`),
+    KEY `idx_parent_id` (`parent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `images` (
@@ -24,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `images` (
     `created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_name` (`name`(255)),
+    UNIQUE KEY `uq_name` (`name`(255)),
     KEY `idx_dir_id` (`dir_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

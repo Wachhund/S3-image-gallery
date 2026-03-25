@@ -39,6 +39,12 @@ final class GalleryService
         return $stmt->fetchAll();
     }
 
+    public function getAllDirs(): array
+    {
+        $stmt = $this->db->query('SELECT id, dirname FROM dirs ORDER BY dirname ASC');
+        return $stmt->fetchAll();
+    }
+
     public function getDir(int $id): ?array
     {
         $stmt = $this->db->prepare('SELECT * FROM dirs WHERE id = :id LIMIT 1');

@@ -10,6 +10,7 @@ use S3Gallery\Service\DatabaseFactory;
 use S3Gallery\Service\GalleryService;
 use S3Gallery\Service\PasskeyService;
 use S3Gallery\Service\S3ClientFactory;
+use S3Gallery\Service\UploadService;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -314,6 +315,99 @@ $app->post('/gallery/create', function (Request $request, Response $response) us
     $dirId = $gallery->createEventGallery($eventDate, $eventName, $bucket);
 
     return $response->withHeader('Location', '/browse/' . $dirId)->withStatus(302);
+});
+
+// --- Auth-protected: Image Upload ---
+
+$app->get('/upload', function (Request $request, Response $response) use ($renderer, $gallery): Response {
+    session_start();
+    if (empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    $csrfToken = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = $csrfToken;
+
+    $allDirs = $gallery->getAllDirs();
+
+    return $renderer->render($response, 'pages/upload.php', [
+        'title' => 'Bilder hochladen',
+        'csrfToken' => $csrfToken,
+        'dirs' => $allDirs,
+    ]);
+});
+
+$app->post('/upload', function (Request $request, Response $response) use ($renderer, $gallery): Response {
+    session_start();
+    if (empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    $data = $request->getParsedBody() ?? [];
+    $csrfToken = $data['csrf_token'] ?? '';
+    $dirId = (int) ($data['dir_id'] ?? 0);
+
+    $errors = [];
+    $successes = [];
+
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $csrfToken)) {
+        $errors[] = 'Ungültiges Formular-Token. Bitte erneut versuchen.';
+    }
+
+    $dir = $gallery->getDir($dirId);
+    if ($dir === null) {
+        $errors[] = 'Ungültiges Zielverzeichnis.';
+    }
+
+    $files = $_FILES['images'] ?? [];
+
+    if (empty($errors) && !empty($files['name'][0])) {
+        $bucket = $_ENV['S3_BUCKET'] ?? 'gallery';
+        $s3 = S3ClientFactory::create();
+        $upload = new UploadService($s3, DatabaseFactory::create(), $bucket);
+
+        $fileCount = count($files['name']);
+        for ($i = 0; $i < $fileCount; $i++) {
+            $file = [
+                'name' => $files['name'][$i],
+                'type' => $files['type'][$i],
+                'tmp_name' => $files['tmp_name'][$i],
+                'error' => $files['error'][$i],
+                'size' => $files['size'][$i],
+            ];
+
+            $validationError = $upload->validateFile($file);
+            if ($validationError !== null) {
+                $errors[] = "{$file['name']}: {$validationError}";
+                continue;
+            }
+
+            try {
+                $result = $upload->processUpload($file, $dirId, $dir['dirname']);
+                $successes[] = "{$file['name']} erfolgreich hochgeladen.";
+            } catch (\Throwable $e) {
+                $errors[] = "{$file['name']}: Upload fehlgeschlagen.";
+            }
+        }
+    } elseif (empty($errors)) {
+        $errors[] = 'Keine Dateien ausgewählt.';
+    }
+
+    if (!empty($successes) && empty($errors)) {
+        return $response->withHeader('Location', '/browse/' . $dirId)->withStatus(302);
+    }
+
+    $newCsrf = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = $newCsrf;
+
+    return $renderer->render($response, 'pages/upload.php', [
+        'title' => 'Bilder hochladen',
+        'csrfToken' => $newCsrf,
+        'dirs' => $gallery->getAllDirs(),
+        'errors' => $errors,
+        'successes' => $successes,
+        'selectedDir' => $dirId,
+    ]);
 });
 
 $app->run();

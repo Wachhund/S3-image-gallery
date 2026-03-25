@@ -14,11 +14,21 @@ use S3Gallery\Service\UploadService;
 
 require __DIR__ . '/../vendor/autoload.php';
 
+// Session hardening — once, before any route
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => !empty($_ENV['APP_SECURE_COOKIES'] ?? true),
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+session_start();
+
 $app = AppFactory::create();
 
 $app->addRoutingMiddleware();
 $app->addErrorMiddleware(
-    displayErrorDetails: (bool) ($_ENV['APP_DEBUG'] ?? true),
+    displayErrorDetails: (bool) ($_ENV['APP_DEBUG'] ?? false),
     logErrors: true,
     logErrorDetails: true,
 );
@@ -148,7 +158,6 @@ $app->post('/register/challenge', function (Request $request, Response $response
         return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
     }
 
-    session_start();
     $createArgs = $passkey->getCreateArgs();
     $_SESSION['webauthn_challenge'] = $passkey->getChallenge();
 
@@ -157,7 +166,6 @@ $app->post('/register/challenge', function (Request $request, Response $response
 });
 
 $app->post('/register/complete', function (Request $request, Response $response) use ($passkey): Response {
-    session_start();
     $challengeHex = $_SESSION['webauthn_challenge'] ?? '';
     unset($_SESSION['webauthn_challenge']);
 
@@ -186,7 +194,6 @@ $app->post('/register/complete', function (Request $request, Response $response)
 // --- Auth: Login ---
 
 $app->get('/login', function (Request $request, Response $response) use ($renderer, $passkey): Response {
-    session_start();
     if (!empty($_SESSION['authenticated'])) {
         return $response->withHeader('Location', '/')->withStatus(302);
     }
@@ -203,7 +210,6 @@ $app->post('/login/challenge', function (Request $request, Response $response) u
         return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
     }
 
-    session_start();
     $getArgs = $passkey->getGetArgs();
     $_SESSION['webauthn_challenge'] = $passkey->getChallenge();
 
@@ -212,7 +218,6 @@ $app->post('/login/challenge', function (Request $request, Response $response) u
 });
 
 $app->post('/login/complete', function (Request $request, Response $response) use ($passkey): Response {
-    session_start();
     $challengeHex = $_SESSION['webauthn_challenge'] ?? '';
     unset($_SESSION['webauthn_challenge']);
 
@@ -236,6 +241,7 @@ $app->post('/login/complete', function (Request $request, Response $response) us
             throw new \RuntimeException('Passkey nicht erkannt.');
         }
 
+        session_regenerate_id(true);
         $_SESSION['authenticated'] = true;
         $response->getBody()->write(json_encode(['success' => true, 'redirect' => '/']));
         return $response->withHeader('Content-Type', 'application/json');
@@ -246,7 +252,6 @@ $app->post('/login/complete', function (Request $request, Response $response) us
 });
 
 $app->get('/logout', function (Request $request, Response $response): Response {
-    session_start();
     session_destroy();
     return $response->withHeader('Location', '/')->withStatus(302);
 });
@@ -254,7 +259,6 @@ $app->get('/logout', function (Request $request, Response $response): Response {
 // --- Auth-protected: Event Gallery Management ---
 
 $app->get('/gallery/create', function (Request $request, Response $response) use ($renderer): Response {
-    session_start();
     if (empty($_SESSION['authenticated'])) {
         return $response->withHeader('Location', '/login')->withStatus(302);
     }
@@ -269,7 +273,6 @@ $app->get('/gallery/create', function (Request $request, Response $response) use
 });
 
 $app->post('/gallery/create', function (Request $request, Response $response) use ($renderer, $gallery): Response {
-    session_start();
     if (empty($_SESSION['authenticated'])) {
         return $response->withHeader('Location', '/login')->withStatus(302);
     }
@@ -320,7 +323,6 @@ $app->post('/gallery/create', function (Request $request, Response $response) us
 // --- Auth-protected: Image Upload ---
 
 $app->get('/upload', function (Request $request, Response $response) use ($renderer, $gallery): Response {
-    session_start();
     if (empty($_SESSION['authenticated'])) {
         return $response->withHeader('Location', '/login')->withStatus(302);
     }
@@ -338,7 +340,6 @@ $app->get('/upload', function (Request $request, Response $response) use ($rende
 });
 
 $app->post('/upload', function (Request $request, Response $response) use ($renderer, $gallery): Response {
-    session_start();
     if (empty($_SESSION['authenticated'])) {
         return $response->withHeader('Location', '/login')->withStatus(302);
     }

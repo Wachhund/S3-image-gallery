@@ -33,10 +33,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www
 
 COPY composer.json composer.lock* ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist 2>/dev/null || true
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
 
 COPY . .
-RUN composer dump-autoload --optimize 2>/dev/null || true
+RUN composer dump-autoload --optimize --no-interaction
 
 RUN chown -R www-data:www-data /var/www
 

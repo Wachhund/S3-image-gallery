@@ -131,10 +131,14 @@ final class PasskeyService
             $signature,
             \lbuchs\WebAuthn\Binary\ByteBuffer::fromHex($publicKey),
             $challenge,
-            null,
+            $prevCounter,
             true,
             true,
         );
+
+        $newCounter = $this->webAuthn->getSignatureCounter();
+        $stmt = $this->db->prepare('UPDATE passkeys SET counter = :counter WHERE credential_id = :cid');
+        $stmt->execute(['counter' => $newCounter, 'cid' => $credentialHex]);
 
         return true;
     }

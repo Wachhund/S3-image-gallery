@@ -250,6 +250,7 @@ code {
 }
 
 .site-nav__link {
+  touch-action: manipulation;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
@@ -356,6 +357,7 @@ code {
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   text-decoration: none;
+  touch-action: manipulation;
   line-height: 1.4;
 }
 
@@ -430,6 +432,8 @@ code {
 .form-select:focus-visible,
 .form-textarea:focus-visible {
   outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.2);
 }
 
 .form-input::placeholder {
@@ -443,6 +447,7 @@ code {
 
 /* Cards */
 .card {
+  touch-action: manipulation;
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);

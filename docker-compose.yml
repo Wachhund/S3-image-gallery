@@ -44,8 +44,8 @@ services:
   db:
     image: mariadb:11
     restart: unless-stopped
-    ports:
-      - "${DB_PORT:-3306}:3306"
+    expose:
+      - "3306"
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_PASSWORD}
       MARIADB_DATABASE: ${DB_NAME}
@@ -66,8 +66,9 @@ services:
   storage:
     image: rustfs/rustfs
     restart: unless-stopped
+    expose:
+      - "9000"
     ports:
-      - "${RUSTFS_API_PORT:-9000}:9000"
       - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY}

@@ -2,9 +2,6 @@
 $currentPath = $_SERVER['REQUEST_URI'] ?? '/';
 $currentPath = strtok($currentPath, '?');
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 $isAuthenticated = !empty($_SESSION['authenticated']);
 
 $navItems = [

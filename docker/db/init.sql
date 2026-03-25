@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS `images` (
     `updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_name` (`name`(255)),
-    KEY `idx_dir_id` (`dir_id`)
+    KEY `idx_dir_id` (`dir_id`),
+    CONSTRAINT `fk_images_dir` FOREIGN KEY (`dir_id`) REFERENCES `dirs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `thumbs` (
@@ -34,8 +35,8 @@ CREATE TABLE IF NOT EXISTS `thumbs` (
     `created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_image_id` (`image_id`),
-    UNIQUE KEY `uq_image_id` (`image_id`)
+    UNIQUE KEY `uq_image_id` (`image_id`),
+    CONSTRAINT `fk_thumbs_image` FOREIGN KEY (`image_id`) REFERENCES `images` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `passkeys` (

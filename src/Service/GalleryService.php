@@ -15,10 +15,11 @@ final class GalleryService
     public function getTopLevelDirs(): array
     {
         $stmt = $this->db->query(
-            'SELECT d.id, d.dirname,
-                    (SELECT COUNT(*) FROM images i WHERE i.dir_id = d.id) AS image_count
+            'SELECT d.id, d.dirname, COUNT(i.id) AS image_count
              FROM dirs d
+             LEFT JOIN images i ON i.dir_id = d.id
              WHERE d.parent_id = 0
+             GROUP BY d.id, d.dirname
              ORDER BY d.dirname ASC'
         );
 
@@ -28,10 +29,11 @@ final class GalleryService
     public function getSubDirs(int $parentId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT d.id, d.dirname,
-                    (SELECT COUNT(*) FROM images i WHERE i.dir_id = d.id) AS image_count
+            'SELECT d.id, d.dirname, COUNT(i.id) AS image_count
              FROM dirs d
+             LEFT JOIN images i ON i.dir_id = d.id
              WHERE d.parent_id = :parent_id
+             GROUP BY d.id, d.dirname
              ORDER BY d.dirname ASC'
         );
         $stmt->execute(['parent_id' => $parentId]);

@@ -53,7 +53,7 @@ final class GalleryService
 
     public function getAllDirs(): array
     {
-        $stmt = $this->db->query('SELECT id, dirname FROM dirs ORDER BY dirname ASC');
+        $stmt = $this->db->query('SELECT id, dirname FROM dirs WHERE parent_id > 0 ORDER BY dirname ASC');
         return $stmt->fetchAll();
     }
 
@@ -184,6 +184,62 @@ final class GalleryService
         $stmt->execute(['dirname' => $year, 'bucket' => $bucket]);
 
         return (int) $this->db->lastInsertId();
+    }
+
+    public function deleteImage(int $imageId, \Aws\S3\S3Client $s3, string $bucket): void
+    {
+        $image = $this->getImage($imageId);
+        if ($image === null) {
+            return;
+        }
+
+        // Delete S3 objects (original + thumbnail)
+        try {
+            $s3->deleteObject(['Bucket' => $bucket, 'Key' => $image['name']]);
+        } catch (\Throwable $e) {}
+
+        if (!empty($image['thumb_name'])) {
+            try {
+                $s3->deleteObject(['Bucket' => $bucket, 'Key' => $image['thumb_name']]);
+            } catch (\Throwable $e) {}
+        }
+
+        // DB deletes — FK CASCADE handles thumbs
+        $stmt = $this->db->prepare('DELETE FROM images WHERE id = :id');
+        $stmt->execute(['id' => $imageId]);
+    }
+
+    public function deleteDirectory(int $dirId, \Aws\S3\S3Client $s3, string $bucket): void
+    {
+        $dir = $this->getDir($dirId);
+        if ($dir === null) {
+            return;
+        }
+
+        // Delete all images in this directory
+        $images = $this->getImagesWithThumbs($dirId, 1, 10000);
+        foreach ($images as $image) {
+            $this->deleteImage((int) $image['id'], $s3, $bucket);
+        }
+
+        // Delete the directory entry
+        $stmt = $this->db->prepare('DELETE FROM dirs WHERE id = :id');
+        $stmt->execute(['id' => $dirId]);
+
+        // Clean up empty parent (year dir)
+        $parentId = (int) $dir['parent_id'];
+        if ($parentId > 0) {
+            $this->cleanupEmptyParent($parentId);
+        }
+    }
+
+    private function cleanupEmptyParent(int $dirId): void
+    {
+        $subdirs = $this->getSubDirs($dirId);
+        if (empty($subdirs)) {
+            $stmt = $this->db->prepare('DELETE FROM dirs WHERE id = :id');
+            $stmt->execute(['id' => $dirId]);
+        }
     }
 
     public function buildBreadcrumbs(int $dirId): array

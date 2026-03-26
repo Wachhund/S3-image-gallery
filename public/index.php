@@ -69,6 +69,12 @@ $app->get('/browse/{id:\d+}', function (Request $request, Response $response, ar
     $imageCount = $gallery->getImageCount($dirId);
     $totalPages = (int) ceil($imageCount / $perPage) ?: 1;
 
+    // CSRF token for delete forms (only used when authenticated)
+    if (!empty($_SESSION['authenticated'])) {
+        $csrfToken = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token'] = $csrfToken;
+    }
+
     return $renderer->render($response, 'pages/browse.php', [
         'title' => basename($dir['dirname']),
         'breadcrumbs' => $gallery->buildBreadcrumbs($dirId),
@@ -409,6 +415,66 @@ $app->post('/upload', function (Request $request, Response $response) use ($rend
         'successes' => $successes,
         'selectedDir' => $dirId,
     ]);
+});
+
+// --- Auth-protected: Delete ---
+
+$app->post('/image/{id:\d+}/delete', function (Request $request, Response $response, array $args) use ($gallery): Response {
+    if (empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    $data = $request->getParsedBody() ?? [];
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $data['csrf_token'] ?? '')) {
+        return $response->withStatus(403);
+    }
+
+    $imageId = (int) $args['id'];
+    $image = $gallery->getImage($imageId);
+    if ($image === null) {
+        return $response->withStatus(404);
+    }
+
+    $s3 = S3ClientFactory::create();
+    $bucket = $_ENV['S3_BUCKET'] ?? 'gallery';
+
+    // Find dir_id for redirect
+    $stmt = DatabaseFactory::create()->prepare('SELECT dir_id FROM images WHERE id = :id');
+    $stmt->execute(['id' => $imageId]);
+    $dirId = (int) ($stmt->fetch()['dir_id'] ?? 0);
+
+    $gallery->deleteImage($imageId, $s3, $bucket);
+
+    return $response->withHeader('Location', $dirId > 0 ? '/browse/' . $dirId : '/')->withStatus(302);
+});
+
+$app->post('/gallery/{id:\d+}/delete', function (Request $request, Response $response, array $args) use ($gallery): Response {
+    if (empty($_SESSION['authenticated'])) {
+        return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    $data = $request->getParsedBody() ?? [];
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $data['csrf_token'] ?? '')) {
+        return $response->withStatus(403);
+    }
+
+    $dirId = (int) $args['id'];
+    $dir = $gallery->getDir($dirId);
+    if ($dir === null) {
+        return $response->withStatus(404);
+    }
+
+    // Only allow deleting event dirs (parent_id > 0), not year dirs
+    if ((int) $dir['parent_id'] === 0) {
+        return $response->withStatus(403);
+    }
+
+    $s3 = S3ClientFactory::create();
+    $bucket = $_ENV['S3_BUCKET'] ?? 'gallery';
+
+    $gallery->deleteDirectory($dirId, $s3, $bucket);
+
+    return $response->withHeader('Location', '/')->withStatus(302);
 });
 
 $app->run();

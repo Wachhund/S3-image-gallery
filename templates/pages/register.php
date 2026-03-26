@@ -98,7 +98,7 @@ $status = $status ?? 'disabled';
             .then(function(data) {
                 if (data.error) throw new Error(data.error);
 
-                var options = data.options;
+                var options = data.options.publicKey || data.options;
                 options.challenge = b64ToBuffer(options.challenge);
                 options.user.id = b64ToBuffer(options.user.id);
                 if (options.excludeCredentials) {
@@ -138,6 +138,9 @@ $status = $status ?? 'disabled';
         }
 
         function b64ToBuffer(b64) {
+            if (typeof b64 === 'string' && b64.indexOf('=?BINARY?B?') === 0) {
+                b64 = b64.replace('=?BINARY?B?', '').replace('?=', '');
+            }
             var s = b64.replace(/-/g, '+').replace(/_/g, '/');
             var raw = atob(s);
             var buf = new Uint8Array(raw.length);
@@ -149,7 +152,7 @@ $status = $status ?? 'disabled';
             var bytes = new Uint8Array(buf);
             var s = '';
             for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-            return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            return btoa(s);
         }
     })();
     </script>

@@ -157,6 +157,7 @@ code {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
   color: var(--color-accent);
+  text-transform: none;
 }
 
 /* Decorative rule — amber accent line */
@@ -730,6 +731,10 @@ code {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+[hidden] {
+  display: none !important;
 }
 
 /* Screen-reader only utility */

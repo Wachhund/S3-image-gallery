@@ -74,8 +74,8 @@ final class PasskeyService
         $challenge = \lbuchs\WebAuthn\Binary\ByteBuffer::fromHex($challengeHex);
 
         $credential = $this->webAuthn->processCreate(
-            $clientDataJSON,
-            $attestationObject,
+            base64_decode($clientDataJSON),
+            base64_decode($attestationObject),
             $challenge,
             true,
             true,
@@ -126,17 +126,17 @@ final class PasskeyService
         $prevCounter = (int) $row['counter'];
 
         $this->webAuthn->processGet(
-            $clientDataJSON,
-            $authenticatorData,
-            $signature,
-            \lbuchs\WebAuthn\Binary\ByteBuffer::fromHex($publicKey),
+            base64_decode($clientDataJSON),
+            base64_decode($authenticatorData),
+            base64_decode($signature),
+            hex2bin($publicKey),
             $challenge,
             $prevCounter,
             true,
             true,
         );
 
-        $newCounter = $this->webAuthn->getSignatureCounter();
+        $newCounter = $this->webAuthn->getSignatureCounter() ?? $prevCounter + 1;
         $stmt = $this->db->prepare('UPDATE passkeys SET counter = :counter WHERE credential_id = :cid');
         $stmt->execute(['counter' => $newCounter, 'cid' => $credentialHex]);
 
@@ -145,8 +145,12 @@ final class PasskeyService
 
     private function storeCredential(object $credential): void
     {
-        $credentialId = $credential->credentialId->getHex();
-        $publicKey = $credential->credentialPublicKey->getHex();
+        $credentialId = $credential->credentialId instanceof \lbuchs\WebAuthn\Binary\ByteBuffer
+            ? $credential->credentialId->getHex()
+            : bin2hex((string) $credential->credentialId);
+        $publicKey = is_string($credential->credentialPublicKey)
+            ? bin2hex($credential->credentialPublicKey)
+            : $credential->credentialPublicKey->getHex();
 
         $stmt = $this->db->prepare(
             'INSERT INTO passkeys (credential_id, public_key, counter)

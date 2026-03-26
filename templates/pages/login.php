@@ -53,7 +53,7 @@ $hasPasskeys = $hasPasskeys ?? false;
         .then(function(data) {
             if (data.error) throw new Error(data.error);
 
-            var options = data.options;
+            var options = data.options.publicKey || data.options;
             options.challenge = b64ToBuffer(options.challenge);
             if (options.allowCredentials) {
                 options.allowCredentials.forEach(function(c) {
@@ -93,6 +93,9 @@ $hasPasskeys = $hasPasskeys ?? false;
     }
 
     function b64ToBuffer(b64) {
+        if (typeof b64 === 'string' && b64.indexOf('=?BINARY?B?') === 0) {
+            b64 = b64.replace('=?BINARY?B?', '').replace('?=', '');
+        }
         var s = b64.replace(/-/g, '+').replace(/_/g, '/');
         var raw = atob(s);
         var buf = new Uint8Array(raw.length);
@@ -104,7 +107,7 @@ $hasPasskeys = $hasPasskeys ?? false;
         var bytes = new Uint8Array(buf);
         var s = '';
         for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-        return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        return btoa(s);
     }
 })();
 </script>

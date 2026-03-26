@@ -131,7 +131,7 @@ final class PasskeyService
             base64_decode($signature),
             hex2bin($publicKey),
             $challenge,
-            $prevCounter,
+            null,
             true,
             true,
         );

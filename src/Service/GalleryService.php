@@ -17,7 +17,8 @@ final class GalleryService
         $stmt = $this->db->query(
             'SELECT d.id, d.dirname, COUNT(i.id) AS image_count
              FROM dirs d
-             LEFT JOIN images i ON i.dir_id = d.id
+             LEFT JOIN dirs cd ON (cd.parent_id = d.id OR cd.id = d.id)
+             LEFT JOIN images i ON i.dir_id = cd.id
              WHERE d.parent_id = 0
              GROUP BY d.id, d.dirname
              ORDER BY d.dirname ASC'

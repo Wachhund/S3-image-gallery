@@ -29,14 +29,20 @@ $years = $years ?? [];
         <?php foreach ($years as $year): ?>
             <a href="/browse/<?= htmlspecialchars((string)($year['id'] ?? '')) ?>" class="card">
                 <div class="card__image">
-                    <div class="placeholder">
-                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor"
-                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="6" y="10" width="36" height="28" rx="3"/>
-                            <circle cx="17" cy="21" r="3.5"/>
-                            <path d="M42 30l-9.5-8.5a2 2 0 00-2.7.1L20 32"/>
-                        </svg>
-                    </div>
+                    <?php if (!empty($year['preview_image_id'])): ?>
+                        <img src="/image/<?= (int) $year['preview_image_id'] ?>?thumb=1"
+                             alt="<?= htmlspecialchars($year['dirname'] ?? '') ?>"
+                             loading="lazy" width="300" height="225">
+                    <?php else: ?>
+                        <div class="placeholder">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor"
+                                 stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="6" y="10" width="36" height="28" rx="3"/>
+                                <circle cx="17" cy="21" r="3.5"/>
+                                <path d="M42 30l-9.5-8.5a2 2 0 00-2.7.1L20 32"/>
+                            </svg>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <div class="card__body">
                     <h2 class="card__title"><?= htmlspecialchars($year['dirname'] ?? '') ?></h2>

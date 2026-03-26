@@ -71,15 +71,17 @@ services:
     ports:
       - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
-    command: server /data --console-address ":9001"
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY}
+      RUSTFS_ADDRESS: "0.0.0.0:9000"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
     volumes:
       - storage-data:/data
     networks:
       - s3gallery
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:9000/minio/health/live || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
